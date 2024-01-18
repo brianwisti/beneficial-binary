@@ -33,24 +33,41 @@ async function main() {
 }
 
 async function pullDirectory(vaultDir: Path, contentDir: Path, folder: string) {
-    let count = 1;
+    let count = 0;
     const folderDir = vaultDir.child(folder);
 
     for await (const file of folderDir.list({ recursive: true })) {
+        const filePulled = await pullFile(vaultDir, contentDir, file);
 
-        const ext = file.extname();
-        if (!allowedExtensions.includes(ext)) {
-            logger.warn(`Skipping ${file} because its extension is not in ${allowedExtensions}.`);
-            continue;
+        if (filePulled) {
+            count++;
         }
-
-        await pullFile(vaultDir, contentDir, file);
-        count++;
     }
-    logger.info(`Found ${count} files in ${folder}`);
+    logger.info(`Pulled ${count} files from ${folder}`);
+}
+
+async function canPullFile(vaultFile: Path) {
+    const stat = await vaultFile.stat();
+
+    if (!stat.isFile()) {
+        return false;
+    }
+
+    const ext = vaultFile.extname();
+
+    if (!allowedExtensions.includes(ext)) {
+        logger.warn(`Cannot pull ${vaultFile}; ${ext} is not in ${allowedExtensions}.`);
+        return false;
+    }
+
+    return true;
 }
 
 async function pullFile(vaultDir: Path, contentDir: Path, vaultFile: Path) {
+    if (!await canPullFile(vaultFile)) {
+        return false;
+    }
+
     const contentSlugPath = vaultDir
         .relative(vaultFile)
         .toArray()
@@ -61,13 +78,15 @@ async function pullFile(vaultDir: Path, contentDir: Path, vaultFile: Path) {
 
     if (await contentFile.exists()) {
         logger.debug(`Skipping ${vaultFile} because ${contentFile} already exists.`);
-        return;
+        return false;
     }
 
     logger.info(`Copying ${vaultFile} to ${contentFile}`);
 
     await contentFile.dirname().mkdir({ recursive: true });
     await vaultFile.copyFile(contentFile);
+
+    return true;
 }
 
 await main();
