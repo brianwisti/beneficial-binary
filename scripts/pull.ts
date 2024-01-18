@@ -5,10 +5,20 @@ import matter from "gray-matter";
 import Path from "@mojojs/path";
 import pino from "pino";
 import slugify from "slugify";
+import XRegexp from "xregexp";
 
 dotenv.config();
 
 const allowedExtensions = [".md"];
+const wikiLinkPattern = `
+    (?<link>
+        \\[\\[
+            (?<note> .+?)
+            (?<alias> \\| .+?)?
+        \\]\\]
+    )
+`;
+
 const logger = pino({
     transport: {
         target: "pino-pretty",
@@ -33,20 +43,6 @@ async function main() {
     }
 }
 
-async function pullDirectory(vaultDir: Path, contentDir: Path, folder: string) {
-    let count = 0;
-    const folderDir = vaultDir.child(folder);
-
-    for await (const file of folderDir.list({ recursive: true })) {
-        const filePulled = await pullFile(vaultDir, contentDir, file);
-
-        if (filePulled) {
-            count++;
-        }
-    }
-    logger.info(`Pulled ${count} files from ${folder}`);
-}
-
 async function canPullFile(vaultFile: Path) {
     const stat = await vaultFile.stat();
 
@@ -67,6 +63,21 @@ async function canPullFile(vaultFile: Path) {
 async function loadNote(vaultFile: Path) {
     const note = matter(await vaultFile.readFile("utf-8"));
     const noteName = vaultFile.basename(vaultFile.extname());
+    note.data.name = noteName;
+    let links: string[] = [];
+
+    // Find all wiki links in the note.
+    XRegexp.forEach(note.content, XRegexp(wikiLinkPattern, "x"), (match) => {
+        const noteName = match?.groups?.note;
+
+        if (noteName) {
+            links.push(noteName);
+        }
+    });
+
+    logger.info(`Found ${links.length} Obsidian links in ${vaultFile}`);
+    logger.info(`Links: ${JSON.stringify([...links])}`);
+    note.data.links = links;
 
     if (!note.data.title) {
         note.data.title = noteName;
@@ -78,6 +89,20 @@ async function loadNote(vaultFile: Path) {
 
     logger.debug(`Note: ${JSON.stringify(note)}`);
     return note;
+}
+
+async function pullDirectory(vaultDir: Path, contentDir: Path, folder: string) {
+    let count = 0;
+    const folderDir = vaultDir.child(folder);
+
+    for await (const file of folderDir.list({ recursive: true })) {
+        const filePulled = await pullFile(vaultDir, contentDir, file);
+
+        if (filePulled) {
+            count++;
+        }
+    }
+    logger.info(`Pulled ${count} files from ${folder}`);
 }
 
 async function pullFile(vaultDir: Path, contentDir: Path, vaultFile: Path) {

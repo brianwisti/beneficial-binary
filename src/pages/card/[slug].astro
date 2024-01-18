@@ -18,7 +18,6 @@ const { entry } = Astro.props;
 const { Content } = await entry.render();
 ---
 
-<CardLayout>
-  <h1>{entry.title}</h1>
+<CardLayout card={entry}>
   <Content />
 </CardLayout>

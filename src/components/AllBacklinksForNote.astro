@@ -1,0 +1,25 @@
+---
+// Hard-coded to specific collections for now.
+import { getCollection } from "astro:content";
+
+const { note } = Astro.props;
+const cards = await getCollection("card");
+const linksFromCards = cards.filter((card) =>
+  card.data.links.includes(note.data.name),
+);
+---
+
+<div>
+  <div>
+    <header>
+      <p>Links from Cards</p>
+    </header>
+    {
+      linksFromCards.map((linkCard) => (
+        <div>
+          <a href={`/card/${linkCard.slug}`} set:html={linkCard.data.name} />
+        </div>
+      ))
+    }
+  </div>
+</div>
