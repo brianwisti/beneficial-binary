@@ -7,11 +7,18 @@
     "start": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "pull": "ts-node --esm scripts/pull.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.4.1",
+    "@mojojs/path": "^1.6.0",
+    "@types/node": "^20.11.5",
     "astro": "^4.2.0",
+    "dotenv": "^16.3.1",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
 }
