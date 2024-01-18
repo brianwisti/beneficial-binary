@@ -1,0 +1,24 @@
+---
+import { getCollection } from "astro:content";
+import CardLayout from "../../layouts/CardLayout.astro";
+
+export async function getStaticPaths() {
+  const cardEntries = await getCollection("card");
+  return cardEntries.map((entry) => {
+    return {
+      params: {
+        slug: entry.slug,
+      },
+      props: { entry },
+    };
+  });
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+---
+
+<CardLayout>
+  <h1>{entry.title}</h1>
+  <Content />
+</CardLayout>
