@@ -1,6 +1,7 @@
 // Pulls public content from an Obsidian vault to `src/content`.
 
 import dotenv from "dotenv";
+import matter from "gray-matter";
 import Path from "@mojojs/path";
 import pino from "pino";
 import slugify from "slugify";
@@ -63,28 +64,51 @@ async function canPullFile(vaultFile: Path) {
     return true;
 }
 
+async function loadNote(vaultFile: Path) {
+    const note = matter(await vaultFile.readFile("utf-8"));
+    const noteName = vaultFile.basename(vaultFile.extname());
+
+    if (!note.data.title) {
+        note.data.title = noteName;
+    }
+
+    if (!note.data.slug) {
+        note.data.slug = slugify(noteName, { lower: true });
+    }
+
+    logger.debug(`Note: ${JSON.stringify(note)}`);
+    return note;
+}
+
 async function pullFile(vaultDir: Path, contentDir: Path, vaultFile: Path) {
     if (!await canPullFile(vaultFile)) {
         return false;
     }
 
-    const contentSlugPath = vaultDir
+    const note = await loadNote(vaultFile);
+    let contentElements = vaultDir
         .relative(vaultFile)
         .toArray()
-        .map((part) => slugify(part, { lower: true }))
-        .join("/");
+        .map((part) => slugify(part, { lower: true }));
+
+    if (note.data.slug) {
+        // If the note has a slug, use that instead of the last part of the path.
+        contentElements[contentElements.length - 1] = `${note.data.slug}.md`;
+    }
+
+    const contentSlugPath = contentElements.join("/");
     logger.debug(`Relative path: ${contentSlugPath}`);
     const contentFile = contentDir.child(contentSlugPath);
 
-    if (await contentFile.exists()) {
-        logger.debug(`Skipping ${vaultFile} because ${contentFile} already exists.`);
-        return false;
-    }
+    // if (await contentFile.exists()) {
+    //     logger.debug(`Skipping ${vaultFile} because ${contentFile} already exists.`);
+    //     return false;
+    // }
 
     logger.info(`Copying ${vaultFile} to ${contentFile}`);
 
     await contentFile.dirname().mkdir({ recursive: true });
-    await vaultFile.copyFile(contentFile);
+    await contentFile.writeFile(matter.stringify(note.content, note.data));
 
     return true;
 }
