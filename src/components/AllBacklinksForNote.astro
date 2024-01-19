@@ -2,20 +2,46 @@
 // Hard-coded to specific collections for now.
 import { getCollection } from "astro:content";
 
+type Card = {
+  slug: string;
+  data: {
+    name: string;
+    links: string[];
+  };
+};
+
+interface Props {
+  note: Card;
+}
+
+function isLinkToNote(note: Card, link: string) {
+  console.log(`Link check: ${link}`);
+  return note.data.name === link;
+}
+
+async function gatherLinksToNote(note: Card) {
+  console.log(note);
+  const cards = await getCollection("card");
+  const linksFromCards = cards.filter(
+    (card) =>
+      card?.data.links?.filter((link: string) => isLinkToNote(note, link))
+        .length > 0,
+  );
+  console.log(linksFromCards);
+  return linksFromCards;
+}
+
 const { note } = Astro.props;
-const cards = await getCollection("card");
-const linksFromCards = cards.filter((card) =>
-  card.data.links.includes(note.data.name),
-);
+const cardBacklinks = await gatherLinksToNote(note);
 ---
 
 <div>
   <div>
     <header>
-      <p>Links from Cards</p>
+      <h2>Related Cards</h2>
     </header>
     {
-      linksFromCards.map((linkCard) => (
+      cardBacklinks.map((linkCard) => (
         <div>
           <a href={`/card/${linkCard.slug}`} set:html={linkCard.data.name} />
         </div>

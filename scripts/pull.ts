@@ -11,12 +11,11 @@ dotenv.config();
 
 const allowedExtensions = [".md"];
 const wikiLinkPattern = `
-    (?<link>
-        \\[\\[
-            (?<note> .+?)
-            (?<alias> \\| .+?)?
-        \\]\\]
-    )
+    \\[\\[
+        (.+?)
+        \\|
+        (.+?)
+    \\]\\]
 `;
 
 const logger = pino({
@@ -24,6 +23,7 @@ const logger = pino({
         target: "pino-pretty",
     }
 });
+
 
 async function main() {
     logger.info("Pulling content from Obsidian vault...");
@@ -60,19 +60,36 @@ async function canPullFile(vaultFile: Path) {
     return true;
 }
 
-async function loadNote(vaultFile: Path) {
+async function loadNote(vaultDir: Path, vaultFile: Path) {
     const note = matter(await vaultFile.readFile("utf-8"));
+    let contentElements = vaultDir.relative(vaultFile).toArray();
     const noteName = vaultFile.basename(vaultFile.extname());
-    note.data.name = noteName;
+    contentElements[contentElements.length - 1] = noteName;
+    note.data.name = contentElements.join("/");
+
     let links: string[] = [];
 
     // Find all wiki links in the note.
-    XRegexp.forEach(note.content, XRegexp(wikiLinkPattern, "x"), (match) => {
-        const noteName = match?.groups?.note;
+    note.content = XRegexp.replace(note.content, XRegexp(wikiLinkPattern, "xg"), (...args) => {
+        logger.info(`Found wiki link: ${JSON.stringify(args)}`);
+        const [match, noteLink, alias, _] = args;
+        const noteSlug = noteLink.toString().split("/").map((part) => slugify(part, { lower: true })).join("/");
 
-        if (noteName) {
-            links.push(noteName);
+        if (noteSlug.startsWith("inbox")) {
+            return `*${alias}*`;
         }
+
+        if (!noteLink) {
+            logger.error(`Could not find note link in ${match}`)
+            return match.toString();
+        }
+
+        links.push(noteLink.toString());
+
+        const linkPath = new Path(noteLink.toString());
+        const linkName = linkPath.basename(linkPath.extname());
+
+        return `<a href="/${noteSlug}">${linkName}</a>`
     });
 
     logger.info(`Found ${links.length} Obsidian links in ${vaultFile}`);
@@ -110,18 +127,17 @@ async function pullFile(vaultDir: Path, contentDir: Path, vaultFile: Path) {
         return false;
     }
 
-    const note = await loadNote(vaultFile);
-    let contentElements = vaultDir
-        .relative(vaultFile)
-        .toArray()
-        .map((part) => slugify(part, { lower: true }));
+    const note = await loadNote(vaultDir, vaultFile);
 
+    let contentElements = vaultDir.relative(vaultFile).toArray();
+    let slugParts = contentElements
+        .map((part) => slugify(part, { lower: true }));
     if (note.data.slug) {
         // If the note has a slug, use that instead of the last part of the path.
-        contentElements[contentElements.length - 1] = `${note.data.slug}.md`;
+        slugParts[slugParts.length - 1] = `${note.data.slug}.md`;
     }
 
-    const contentSlugPath = contentElements.join("/");
+    const contentSlugPath = slugParts.join("/");
     logger.debug(`Relative path: ${contentSlugPath}`);
     const contentFile = contentDir.child(contentSlugPath);
 
