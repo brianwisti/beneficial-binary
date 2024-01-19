@@ -1,0 +1,12 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import AllBacklinksForNote from "../components/AllBacklinksForNote.astro";
+
+const { note } = Astro.props;
+---
+
+<BaseLayout>
+  <h1>{note.data.title}</h1>
+  <slot />
+  <AllBacklinksForNote note={note} />
+</BaseLayout>

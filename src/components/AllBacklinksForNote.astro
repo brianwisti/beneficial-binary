@@ -19,7 +19,7 @@ function isLinkToNote(note: Card, link: string) {
   return note.data.name === link;
 }
 
-async function gatherLinksToNote(note: Card) {
+async function gatherCardLinksToNote(note: Card) {
   console.log(note);
   const cards = await getCollection("card");
   const linksFromCards = cards.filter(
@@ -31,8 +31,21 @@ async function gatherLinksToNote(note: Card) {
   return linksFromCards;
 }
 
+async function gatherPostLinksToNote(note: Card) {
+  console.log(note);
+  const cards = await getCollection("post");
+  const linksFromCards = cards.filter(
+    (card) =>
+      card?.data.links?.filter((link: string) => isLinkToNote(note, link))
+        .length > 0,
+  );
+  console.log(linksFromCards);
+  return linksFromCards;
+}
+
 const { note } = Astro.props;
-const cardBacklinks = await gatherLinksToNote(note);
+const cardBacklinks = await gatherCardLinksToNote(note);
+const postBacklinks = await gatherPostLinksToNote(note);
 ---
 
 <div>
@@ -43,7 +56,19 @@ const cardBacklinks = await gatherLinksToNote(note);
     {
       cardBacklinks.map((linkCard) => (
         <div>
-          <a href={`/card/${linkCard.slug}`} set:html={linkCard.data.name} />
+          <a href={`/card/${linkCard.slug}`} set:html={linkCard.data.title} />
+        </div>
+      ))
+    }
+  </div>
+  <div>
+    <header>
+      <h2>Related Posts</h2>
+    </header>
+    {
+      postBacklinks.map((linkPost) => (
+        <div>
+          <a href={`/post/${linkPost.slug}`} set:html={linkPost.data.title} />
         </div>
       ))
     }
